@@ -4,6 +4,13 @@ from typing import Dict, Any, Optional, Tuple
 logger = logging.getLogger("guardstack.prioritization.risk_engine")
 
 class RiskPrioritizationEngine:
+    """
+    Locked Scope Prioritization Engine combining three authoritative feeds:
+    1. CVSS: Common Vulnerability Scoring System (base technical severity)
+    2. EPSS: FIRST.org Exploit Prediction Scoring System (empirical exploit probability)
+    3. CISA KEV: Known Exploited Vulnerabilities Catalog (active wild exploitation)
+    """
+
     SEVERITY_DEFAULT_CVSS = {
         "CRITICAL": 9.5,
         "HIGH": 8.0,
@@ -16,81 +23,56 @@ class RiskPrioritizationEngine:
     def calculate_priority_score(
         cls,
         severity: str,
-        cvss_score: Optional[float],
-        epss_score: Optional[float],
-        in_cisa_kev: bool,
-        reachability_status: str,
-        exposure_status: str
+        cvss_score: Optional[float] = None,
+        epss_score: Optional[float] = None,
+        in_cisa_kev: bool = False
     ) -> Tuple[float, str, Dict[str, Any]]:
         """
-        Computes a comprehensive 0-100 Priority Risk Score based on CVSS, EPSS,
-        CISA KEV, Call-Graph Reachability, and Public Exposure.
+        Computes a 0-100 Priority Risk Score combining CVSS (45%), EPSS (35%), and CISA KEV (20%).
 
         Returns:
             priority_score: float (0.0 to 100.0)
             priority_tier: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
             score_breakdown: detailed components dict
         """
-        # 1. Base CVSS points (up to 35 points)
+        # 1. Base CVSS severity points (up to 45 points)
         cvss_val = cvss_score if cvss_score is not None else cls.SEVERITY_DEFAULT_CVSS.get(severity.upper(), 5.0)
         cvss_clamped = min(10.0, max(0.0, float(cvss_val)))
-        cvss_contribution = (cvss_clamped / 10.0) * 35.0
+        cvss_points = (cvss_clamped / 10.0) * 45.0
 
-        # 2. EPSS exploit likelihood points (up to 25 points)
+        # 2. EPSS exploit probability points (up to 35 points)
         epss_val = epss_score if epss_score is not None else 0.05
         epss_clamped = min(1.0, max(0.0, float(epss_val)))
-        epss_contribution = epss_clamped * 25.0
+        epss_points = epss_clamped * 35.0
 
-        # 3. CISA KEV actively exploited bonus (up to 15 points)
-        kev_contribution = 15.0 if in_cisa_kev else 0.0
+        # 3. CISA KEV actively exploited bonus (20 points)
+        kev_points = 20.0 if in_cisa_kev else 0.0
 
-        threat_subtotal = cvss_contribution + epss_contribution + kev_contribution
+        # Total 0-100
+        raw_score = cvss_points + epss_points + kev_points
+        priority_score = round(min(100.0, max(0.0, raw_score)), 1)
 
-        # 4. Reachability factor
-        reach_status = reachability_status.lower()
-        if reach_status == "reachable":
-            reach_factor = 1.0
-        elif reach_status == "unreachable":
-            # Significant noise reduction for dead / unreferenced code
-            reach_factor = 0.25
-        else:
-            reach_factor = 0.75
-
-        # 5. Public exposure factor
-        exp_status = exposure_status.lower()
-        if exp_status == "public_route":
-            exposure_factor = 1.0
-        elif exp_status == "internal_only":
-            exposure_factor = 0.45
-        else:
-            exposure_factor = 0.80
-
-        # Normalized final score scaled to 0-100
-        raw_final = (threat_subtotal * reach_factor * exposure_factor) * (100.0 / 75.0)
-        priority_score = round(min(100.0, max(0.0, raw_final)), 1)
-
-        # Categorize into priority tiers
-        if priority_score >= 75.0:
+        # Categorize priority tiers
+        if priority_score >= 70.0:
             tier = "CRITICAL"
-        elif priority_score >= 55.0:
+        elif priority_score >= 50.0:
             tier = "HIGH"
-        elif priority_score >= 35.0:
+        elif priority_score >= 30.0:
             tier = "MEDIUM"
         else:
             tier = "LOW"
 
         breakdown = {
             "cvss_score": round(cvss_clamped, 1),
-            "cvss_points": round(cvss_contribution, 2),
+            "cvss_points": round(cvss_points, 2),
+            "cvss_weight": "45%",
             "epss_probability": round(epss_clamped, 4),
-            "epss_points": round(epss_contribution, 2),
+            "epss_points": round(epss_points, 2),
+            "epss_weight": "35%",
             "in_cisa_kev": in_cisa_kev,
-            "kev_bonus_points": kev_contribution,
-            "reachability_status": reach_status,
-            "reachability_multiplier": reach_factor,
-            "exposure_status": exp_status,
-            "exposure_multiplier": exposure_factor,
-            "is_actionable_blocker": priority_score >= 55.0
+            "kev_bonus_points": kev_points,
+            "kev_weight": "20%",
+            "is_actionable_blocker": priority_score >= 50.0
         }
 
         return priority_score, tier, breakdown

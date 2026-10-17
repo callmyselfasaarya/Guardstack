@@ -1,29 +1,34 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Set, Optional
 from app.scanners.base import BaseScanner, RawFinding
 from app.scanners.semgrep_scanner import SemgrepScanner
 from app.scanners.gitleaks_scanner import GitleaksScanner
 from app.scanners.trivy_scanner import TrivyScanner
-from app.scanners.zap_scanner import ZapScanner
 
 logger = logging.getLogger("guardstack.scanners.orchestrator")
 
 class ScannerOrchestrator:
+    """
+    Locked Scope Scanner Orchestrator:
+    Executes exactly three core scanners:
+    1. Semgrep (SAST)
+    2. Gitleaks (Secrets)
+    3. Trivy / OSV (Dependencies)
+    """
+
     def __init__(self):
         self.scanners: Dict[str, BaseScanner] = {
             "semgrep": SemgrepScanner(),
             "gitleaks": GitleaksScanner(),
             "trivy": TrivyScanner(),
-            "zap": ZapScanner()
         }
 
     async def execute_scans(
         self,
         target_dir: Path,
-        enabled_scanners: Optional[List[str]] = None,
-        dast_url: Optional[str] = None
+        enabled_scanners: Optional[List[str]] = None
     ) -> List[RawFinding]:
         """
         Run selected scanners concurrently against the target workspace directory.
@@ -35,10 +40,7 @@ class ScannerOrchestrator:
         for name in enabled_scanners:
             scanner = self.scanners.get(name)
             if scanner:
-                if name == "zap" and dast_url:
-                    tasks.append(scanner.scan_url(dast_url))
-                elif name != "zap":
-                    tasks.append(scanner.scan(target_dir))
+                tasks.append(scanner.scan(target_dir))
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
         all_findings: List[RawFinding] = []
@@ -49,7 +51,7 @@ class ScannerOrchestrator:
             elif isinstance(res, list):
                 all_findings.extend(res)
 
-        # Deduplicate by fingerprint
+        # Deduplicate and fingerprint findings
         unique_findings: List[RawFinding] = []
         seen_fingerprints: Set[str] = set()
 
@@ -59,7 +61,7 @@ class ScannerOrchestrator:
                 seen_fingerprints.add(fp)
                 unique_findings.append(f)
 
-        logger.info(f"Orchestration complete. Collected {len(unique_findings)} unique findings.")
+        logger.info(f"Orchestration complete across 3 core scanners. Collected {len(unique_findings)} unique findings.")
         return unique_findings
 
     @staticmethod
@@ -69,15 +71,18 @@ class ScannerOrchestrator:
         previous_fixed_fingerprints: Set[str]
     ) -> Dict[str, str]:
         """
-        Computes lifecycle status (new, fixed, regressed) for findings across commits.
-        Returns mapping from fingerprint to status.
+        Computes lifecycle status across commits:
+        - 'new': Introduced in this commit/PR
+        - 'persistent': Unresolved and carried over from previous commits
+        - 'fixed': Resolved in current commit
+        - 'regressed': Was previously fixed but reappeared
         """
         status_map: Dict[str, str] = {}
         for fp in current_fingerprints:
             if fp in previous_fixed_fingerprints:
                 status_map[fp] = "regressed"
             elif fp in previous_active_fingerprints:
-                status_map[fp] = "existing"
+                status_map[fp] = "persistent"
             else:
                 status_map[fp] = "new"
         return status_map

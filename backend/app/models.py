@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Any
+from typing import List, Optional
 from sqlalchemy import String, Integer, Float, Boolean, Text, JSON, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
@@ -30,7 +30,7 @@ class Scan(Base):
     commit_hash: Mapped[str] = mapped_column(String(64), index=True, default="HEAD")
     branch: Mapped[str] = mapped_column(String(100), default="main")
     pr_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    trigger_type: Mapped[str] = mapped_column(String(50), default="manual")  # push, pull_request, manual, dast, benchmark
+    trigger_type: Mapped[str] = mapped_column(String(50), default="manual")  # push, pull_request, manual
     status: Mapped[str] = mapped_column(String(50), default="queued")       # queued, running, completed, failed
     scanner_types: Mapped[str] = mapped_column(String(255), default="semgrep,gitleaks,trivy")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -49,21 +49,19 @@ class Finding(Base):
     repo_id: Mapped[str] = mapped_column(String(36), ForeignKey("repositories.id", ondelete="CASCADE"), index=True)
     
     fingerprint: Mapped[str] = mapped_column(String(64), index=True)
-    tool: Mapped[str] = mapped_column(String(50), index=True)  # semgrep, gitleaks, trivy, zap
+    tool: Mapped[str] = mapped_column(String(50), index=True)  # semgrep, gitleaks, trivy
     rule_id: Mapped[str] = mapped_column(String(255), index=True)
     title: Mapped[str] = mapped_column(String(500))
     message: Mapped[str] = mapped_column(Text)
     severity: Mapped[str] = mapped_column(String(50), index=True)  # CRITICAL, HIGH, MEDIUM, LOW, INFO
     
+    # 3-Factor Authoritative Threat Feeds
     cve_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     cvss_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     epss_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     cisa_kev: Mapped[bool] = mapped_column(Boolean, default=False)
     
-    reachability_status: Mapped[str] = mapped_column(String(50), default="unknown")  # reachable, unreachable, unknown
-    reachability_trace: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    exposure_status: Mapped[str] = mapped_column(String(50), default="unknown")       # public_route, internal_only, unknown
-    
+    # Prioritization Score (0-100)
     priority_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
     
     file_path: Mapped[str] = mapped_column(String(1024), index=True)
@@ -71,6 +69,7 @@ class Finding(Base):
     end_line: Mapped[int] = mapped_column(Integer, default=1)
     code_snippet: Mapped[str] = mapped_column(Text, default="")
     
+    # Cross-commit lifecycle tracking (new, persistent, fixed, regressed)
     status: Mapped[str] = mapped_column(String(50), default="new", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     
@@ -85,13 +84,15 @@ class FindingAnalysis(Base):
     finding_id: Mapped[str] = mapped_column(String(36), ForeignKey("findings.id", ondelete="CASCADE"), unique=True, index=True)
     
     explanation: Mapped[str] = mapped_column(Text)
-    attack_scenario: Mapped[str] = mapped_column(Text)
+    attack_scenario: Mapped[str] = mapped_column(Text, default="")
     false_positive_likelihood: Mapped[str] = mapped_column(String(50), default="low")  # low, medium, high
     confidence: Mapped[float] = mapped_column(Float, default=0.85)
     
     proposed_patch: Mapped[str] = mapped_column(Text, default="")
     
+    # Fix Validation Loop: "verified" | "failed" | "untested"
     fix_validated: Mapped[bool] = mapped_column(Boolean, default=False)
+    validation_status: Mapped[str] = mapped_column(String(50), default="untested")
     validation_details: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     
     applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -99,23 +100,12 @@ class FindingAnalysis(Base):
 
     finding: Mapped["Finding"] = relationship("Finding", back_populates="analysis")
 
-class DASTTarget(Base):
-    __tablename__ = "dast_targets"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    url: Mapped[str] = mapped_column(String(1024), unique=True)
-    verification_token: Mapped[str] = mapped_column(String(128))
-    verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_scanned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-
 class BenchmarkRun(Base):
     __tablename__ = "benchmark_runs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(255))
-    test_suite: Mapped[str] = mapped_column(String(100))
+    test_suite: Mapped[str] = mapped_column(String(100), default="owasp_top10_corpus")
     total_cases: Mapped[int] = mapped_column(Integer, default=0)
     raw_findings_count: Mapped[int] = mapped_column(Integer, default=0)
     filtered_findings_count: Mapped[int] = mapped_column(Integer, default=0)

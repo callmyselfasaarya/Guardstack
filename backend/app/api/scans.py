@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import os
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -10,12 +8,9 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.analyzer import FindingAIAnalyzer
 from app.ai.fix_validator import FixValidator
-from app.config import settings
 from app.database import get_db, AsyncSessionLocal
 from app.models import Repository, Scan, Finding, FindingAnalysis
-from app.prioritization.exposure import ExposureAnalyzer
 from app.prioritization.feeds import feed_client
-from app.prioritization.reachability import PythonCallGraphAnalyzer
 from app.prioritization.risk_engine import RiskPrioritizationEngine
 from app.scanners.orchestrator import ScannerOrchestrator
 from app.schemas import ScanTriggerRequest, ScanResponse
@@ -24,7 +19,7 @@ logger = logging.getLogger("guardstack.api.scans")
 router = APIRouter(prefix="/scans", tags=["Scans"])
 
 async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanners: List[str]):
-    """Background async worker running scanner orchestration, risk engine, and AI fix validation."""
+    """Background async worker running scanner orchestration (Semgrep, Gitleaks, Trivy), risk engine, and AI fix validation."""
     async with AsyncSessionLocal() as db:
         stmt = select(Scan).where(Scan.id == scan_id)
         scan = (await db.execute(stmt)).scalar_one_or_none()
@@ -35,23 +30,14 @@ async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanne
         await db.commit()
 
         try:
-            # Resolve target directory
             target_dir = Path(target_path)
             if not target_dir.exists():
-                # Default to benchmark corpus if path doesn't exist
                 target_dir = Path(__file__).resolve().parent.parent / "benchmark" / "corpus" / "vulnerable_app"
 
             orchestrator = ScannerOrchestrator()
             raw_findings = await orchestrator.execute_scans(target_dir, enabled_scanners=scanners)
 
-            # Build Call Graph
-            reachability_analyzer = PythonCallGraphAnalyzer(target_dir)
-            reachability_analyzer.build_graph()
-
             validator = FixValidator()
-            findings_objects = []
-            analyses_objects = []
-
             critical_c = 0
             high_c = 0
             medium_c = 0
@@ -59,20 +45,20 @@ async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanne
             actionable_c = 0
             validated_fixes_c = 0
 
-            # Historic fingerprints for repo to compute new/regressed state
+            # Historic fingerprints for repo to compute new/persistent/fixed state
             hist_stmt = select(Finding.fingerprint, Finding.status).where(Finding.repo_id == repo_id)
             hist_res = (await db.execute(hist_stmt)).all()
-            prev_active = {fp for fp, st in hist_res if st in {"new", "existing", "regressed"}}
+            prev_active = {fp for fp, st in hist_res if st in {"new", "persistent", "regressed"}}
             prev_fixed = {fp for fp, st in hist_res if st == "fixed"}
 
             for rf in raw_findings:
                 fp = rf.generate_fingerprint()
 
-                # 1. State lifecycle
+                # 1. State lifecycle across commits (new / persistent / regressed)
                 if fp in prev_fixed:
                     status = "regressed"
                 elif fp in prev_active:
-                    status = "existing"
+                    status = "persistent"
                 else:
                     status = "new"
 
@@ -80,21 +66,15 @@ async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanne
                 file_full = target_dir / rf.file_path
                 file_text = file_full.read_text(encoding="utf-8", errors="ignore") if file_full.exists() else rf.code_snippet
 
-                # 3. Threat feeds
+                # 3. Threat feeds (EPSS and CISA KEV)
                 epss_val, in_kev = await feed_client.get_cve_threat_intel(rf.cve_id)
 
-                # 4. Reachability & Exposure
-                reach_status, reach_trace = reachability_analyzer.analyze_finding_reachability(rf.file_path, rf.start_line)
-                exp_status, exp_meta = ExposureAnalyzer.evaluate_exposure(file_text, rf.code_snippet, rf.start_line)
-
-                # 5. Risk Prioritization
+                # 4. Risk Prioritization (CVSS + EPSS + CISA KEV)
                 priority_score, tier, breakdown = RiskPrioritizationEngine.calculate_priority_score(
                     severity=rf.severity,
                     cvss_score=rf.cvss_score,
                     epss_score=epss_val,
-                    in_cisa_kev=in_kev,
-                    reachability_status=reach_status,
-                    exposure_status=exp_status
+                    in_cisa_kev=in_kev
                 )
 
                 if rf.severity == "CRITICAL":
@@ -109,24 +89,24 @@ async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanne
                 if breakdown["is_actionable_blocker"]:
                     actionable_c += 1
 
-                # 6. AI Analysis & Fix Validation Loop
+                # 5. LLM Analysis: structured JSON (explanation, false-positive likelihood, confidence, proposed patch)
                 analysis_dict = await FindingAIAnalyzer.analyze_finding(
                     finding=rf,
-                    file_content=file_text,
-                    reachability_info=reach_trace,
-                    exposure_info={"exposure_status": exp_status}
+                    file_content=file_text
                 )
 
+                # 6. Fix Validation Loop: apply patch to copy, re-run scanner, mark "verified" or "failed"
                 is_valid, val_details = await validator.validate_patch(
                     finding=rf,
                     proposed_patch=analysis_dict.get("proposed_patch", ""),
                     repo_root=target_dir
                 )
 
+                validation_status = "verified" if is_valid else "failed"
                 if is_valid:
                     validated_fixes_c += 1
 
-                # Instantiate Finding Model
+                # Persist Finding Model
                 f_model = Finding(
                     scan_id=scan.id,
                     repo_id=repo_id,
@@ -140,9 +120,6 @@ async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanne
                     cvss_score=rf.cvss_score,
                     epss_score=epss_val,
                     cisa_kev=in_kev,
-                    reachability_status=reach_status,
-                    reachability_trace=reach_trace,
-                    exposure_status=exp_status,
                     priority_score=priority_score,
                     file_path=rf.file_path,
                     start_line=rf.start_line,
@@ -153,7 +130,7 @@ async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanne
                 db.add(f_model)
                 await db.flush()
 
-                # Instantiate Analysis Model
+                # Persist Finding Analysis Model
                 a_model = FindingAnalysis(
                     finding_id=f_model.id,
                     explanation=analysis_dict.get("explanation", ""),
@@ -162,6 +139,7 @@ async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanne
                     confidence=analysis_dict.get("confidence", 0.90),
                     proposed_patch=analysis_dict.get("proposed_patch", ""),
                     fix_validated=is_valid,
+                    validation_status=validation_status,
                     validation_details=val_details
                 )
                 db.add(a_model)
@@ -170,7 +148,6 @@ async def run_scan_pipeline(scan_id: str, repo_id: str, target_path: str, scanne
             current_fps = {rf.generate_fingerprint() for rf in raw_findings}
             for active_fp in prev_active:
                 if active_fp not in current_fps:
-                    # Mark most recent finding with this fingerprint as fixed
                     update_stmt = select(Finding).where(Finding.repo_id == repo_id, Finding.fingerprint == active_fp)
                     prev_finding = (await db.execute(update_stmt)).scalars().first()
                     if prev_finding:
@@ -208,7 +185,6 @@ async def trigger_scan(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
-    # Ensure repository exists
     stmt = select(Repository).where(Repository.full_name == payload.repo_full_name)
     repo = (await db.execute(stmt)).scalar_one_or_none()
     if not repo:

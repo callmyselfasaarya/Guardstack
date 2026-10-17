@@ -27,11 +27,12 @@ class FindingAnalysisResponse(BaseModel):
     id: str
     finding_id: str
     explanation: str
-    attack_scenario: str
-    false_positive_likelihood: str
-    confidence: float
-    proposed_patch: str
-    fix_validated: bool
+    attack_scenario: str = ""
+    false_positive_likelihood: str = "low"
+    confidence: float = 0.85
+    proposed_patch: str = ""
+    fix_validated: bool = False
+    validation_status: str = "untested"  # "verified" | "failed" | "untested"
     validation_details: Optional[Dict[str, Any]] = None
     applied_at: Optional[datetime] = None
     created_at: datetime
@@ -45,7 +46,7 @@ class FindingResponse(BaseModel):
     scan_id: str
     repo_id: str
     fingerprint: str
-    tool: str
+    tool: str  # semgrep, gitleaks, trivy
     rule_id: str
     title: str
     message: str
@@ -54,15 +55,12 @@ class FindingResponse(BaseModel):
     cvss_score: Optional[float] = None
     epss_score: Optional[float] = None
     cisa_kev: bool = False
-    reachability_status: str
-    reachability_trace: Optional[Dict[str, Any]] = None
-    exposure_status: str
     priority_score: float
     file_path: str
     start_line: int
     end_line: int
     code_snippet: str
-    status: str
+    status: str  # new, persistent, fixed, regressed
     created_at: datetime
     analysis: Optional[FindingAnalysisResponse] = None
 
@@ -70,7 +68,7 @@ class FindingResponse(BaseModel):
         from_attributes = True
 
 class FindingStatusUpdate(BaseModel):
-    status: str = Field(..., description="new, accepted, false_positive, fixed")
+    status: str = Field(..., description="new, persistent, fixed, false_positive")
 
 # --- Scans ---
 class ScanTriggerRequest(BaseModel):
@@ -90,9 +88,8 @@ class ScanSummaryStats(BaseModel):
     info: int = 0
     noise_reduction_pct: float = 0.0
     fixes_validated_pct: float = 0.0
-    reachable_count: int = 0
-    public_exposure_count: int = 0
     new_count: int = 0
+    persistent_count: int = 0
     fixed_count: int = 0
     regressed_count: int = 0
 
@@ -122,29 +119,11 @@ class WebhookSimulatePRRequest(BaseModel):
     branch: str = "feature/profile-uploads"
     base_branch: str = "main"
     files_changed: Optional[List[str]] = None
-    code_sample_suite: Optional[str] = "vulnerable_web_api"  # or 'custom', 'juice_shop_sample'
-
-# --- DAST Verification & Scan ---
-class DASTChallengeRequest(BaseModel):
-    target_url: str
-
-class DASTChallengeResponse(BaseModel):
-    target_url: str
-    verification_token: str
-    expected_path: str
-    expected_header: str
-    instructions: str
-
-class DASTVerifyRequest(BaseModel):
-    target_url: str
-
-class DASTScanRequest(BaseModel):
-    target_url: str
-    scan_depth: Optional[str] = "baseline"
+    code_sample_suite: Optional[str] = "vulnerable_web_api"
 
 # --- Benchmark Suite ---
 class BenchmarkTriggerRequest(BaseModel):
-    suite_name: str = "owasp_top10_corpus"  # owasp_top10_corpus, juice_shop_synthetic, cve_benchmark
+    suite_name: str = "owasp_top10_corpus"
 
 class BenchmarkRunResponse(BaseModel):
     id: str
@@ -173,7 +152,6 @@ class AppSettingsResponse(BaseModel):
     ollama_model: str
     has_github_app: bool
     github_app_id: str
-    dast_allow_localhost: bool
 
 class AppSettingsUpdate(BaseModel):
     llm_provider: Optional[str] = None

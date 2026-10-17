@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
-from app.api import repositories, scans, findings, webhooks, dast, benchmark, settings as app_settings
+from app.api import repositories, scans, findings, webhooks, benchmark, settings as app_settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,7 +41,6 @@ app.include_router(repositories.router, prefix=settings.API_V1_STR)
 app.include_router(scans.router, prefix=settings.API_V1_STR)
 app.include_router(findings.router, prefix=settings.API_V1_STR)
 app.include_router(webhooks.router, prefix=settings.API_V1_STR)
-app.include_router(dast.router, prefix=settings.API_V1_STR)
 app.include_router(benchmark.router, prefix=settings.API_V1_STR)
 app.include_router(app_settings.router, prefix=settings.API_V1_STR)
 
