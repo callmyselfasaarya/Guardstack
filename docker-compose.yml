@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: guardstack-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: guardstack
+      POSTGRES_PASSWORD: guardstack_dev_password
+      POSTGRES_DB: guardstack
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guardstack"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: guardstack-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: guardstack-backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://guardstack:guardstack_dev_password@postgres:5432/guardstack
+      SECRET_KEY: guardstack-production-secret-key-32bytes
+      LLM_PROVIDER: heuristic
+      DAST_ALLOW_LOCALHOST: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./backend/workspace_tmp:/app/workspace_tmp
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: guardstack-frontend
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
