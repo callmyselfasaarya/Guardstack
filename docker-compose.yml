@@ -36,7 +36,6 @@ services:
       DATABASE_URL: postgresql+asyncpg://guardstack:guardstack_dev_password@postgres:5432/guardstack
       SECRET_KEY: guardstack-production-secret-key-32bytes
       LLM_PROVIDER: heuristic
-      DAST_ALLOW_LOCALHOST: "true"
     ports:
       - "8000:8000"
     depends_on:

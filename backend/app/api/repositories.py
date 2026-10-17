@@ -23,7 +23,7 @@ async def list_repositories(db: AsyncSession = Depends(get_db)):
         # Count open findings
         finding_count_stmt = select(func.count(Finding.id)).where(
             Finding.repo_id == r.id,
-            Finding.status.in_(["new", "regressed", "existing"])
+            Finding.status.in_(["new", "persistent", "regressed", "existing"])
         )
         findings_count = (await db.execute(finding_count_stmt)).scalar() or 0
 

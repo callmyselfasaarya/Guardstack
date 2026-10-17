@@ -5,7 +5,6 @@ import {
   ShieldAlert,
   GitBranch,
   BarChart3,
-  Globe,
   Settings as SettingsIcon,
   Play,
   Cpu
@@ -31,7 +30,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'findings', label: 'Vulnerabilities', icon: ShieldAlert },
     { id: 'scans', label: 'Repositories & PRs', icon: GitBranch },
     { id: 'benchmark', label: 'Defense Benchmark', icon: BarChart3 },
-    { id: 'dast', label: 'DAST Verification', icon: Globe },
     { id: 'settings', label: 'Engine Settings', icon: SettingsIcon },
   ];
 
@@ -61,7 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
-              Intelligent Pipeline & Automated PR Remediation
+              Intelligent Pipeline &amp; Automated PR Remediation
             </p>
           </div>
         </div>

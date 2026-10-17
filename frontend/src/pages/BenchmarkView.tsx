@@ -201,7 +201,7 @@ export const BenchmarkView: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Prioritizes findings using CVSS + EPSS + KEV + AST reachability + public route exposure. Validates fixes with a sandboxed re-scan loop before posting to PR.
+            Prioritizes findings using CVSS, EPSS, and CISA KEV feeds. Validates fixes with a sandboxed re-scan loop before posting to PR.
           </p>
           <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 space-y-2 text-xs">
             <div className="flex justify-between">
@@ -234,11 +234,11 @@ export const BenchmarkView: React.FC = () => {
                   <tr>
                     <th className="py-3 px-4">Test Finding</th>
                     <th className="py-3 px-4">Scanner</th>
-                    <th className="py-3 px-4">AST Reachability</th>
-                    <th className="py-3 px-4">Threat Intel</th>
+                    <th className="py-3 px-4">Severity & CVSS</th>
+                    <th className="py-3 px-4">EPSS & KEV Feeds</th>
                     <th className="py-3 px-4">Risk Score</th>
                     <th className="py-3 px-4">Actionable Blocker</th>
-                    <th className="py-3 px-4">Re-Scan Validation</th>
+                    <th className="py-3 px-4">Re-Scan Fix Validation</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-300 font-mono text-[11px]">
@@ -249,20 +249,14 @@ export const BenchmarkView: React.FC = () => {
                         <div className="text-[10px] text-slate-400 font-mono">{item.file_path}:{item.start_line}</div>
                       </td>
                       <td className="py-3 px-4 uppercase text-slate-400">{item.tool}</td>
-                      <td className="py-3 px-4">
-                        {item.reachability === 'reachable' ? (
-                          <span className="text-emerald-400 font-semibold font-sans">Reachable (Route)</span>
-                        ) : (
-                          <span className="text-slate-500 font-sans">Dead Code (Unreachable)</span>
-                        )}
+                      <td className="py-3 px-4 font-sans">
+                        <span className="font-semibold text-rose-300">{item.severity}</span>
                       </td>
                       <td className="py-3 px-4 font-sans">
                         {item.cisa_kev ? (
-                          <span className="text-rose-400 font-bold">CISA KEV ⚠️</span>
-                        ) : item.epss > 0.1 ? (
-                          <span className="text-indigo-300">EPSS: {(item.epss * 100).toFixed(0)}%</span>
+                          <span className="text-rose-400 font-semibold block">⚠️ CISA KEV ({(item.epss * 100).toFixed(0)}% EPSS)</span>
                         ) : (
-                          <span className="text-slate-500">Low Threat</span>
+                          <span className="text-slate-400 font-sans block">{item.epss ? (item.epss * 100).toFixed(0) : '< 5'}% EPSS</span>
                         )}
                       </td>
                       <td className="py-3 px-4 font-bold text-white">

@@ -1,14 +1,11 @@
 import React from 'react';
 import {
   ShieldAlert,
-  ShieldCheck,
   CheckCircle2,
-  Filter,
   ArrowRight,
   GitPullRequest,
   BarChart3,
   Flame,
-  Radio,
   Cpu
 } from 'lucide-react';
 import { OverviewStats, Finding } from '../types';
@@ -46,7 +43,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Prioritize real risks. Eliminate developer fatigue.
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Guardstack normalizes findings across Semgrep SAST, Gitleaks, Trivy, and OWASP ZAP, down-weights unreachable code using Python AST call-graphs, and auto-validates AI patches in an isolated re-scan loop before posting to PRs.
+              Guardstack normalizes findings across Semgrep SAST, Gitleaks secrets, and Trivy dependencies, scores real-world risk by combining CVSS, EPSS, and CISA KEV feeds, and auto-validates AI patches in an isolated re-scan loop before posting to PRs.
             </p>
           </div>
 
@@ -139,50 +136,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400">
-            💡 Guardstack filters out findings marked unreachable or unexposed, dropping non-actionable noise by <strong className="text-emerald-400">{stats.noise_reduction_pct}%</strong>.
+            💡 Guardstack prioritizes findings using CVSS, EPSS, and CISA KEV, dropping non-actionable noise by <strong className="text-emerald-400">{stats.noise_reduction_pct}%</strong>.
           </div>
         </div>
 
-        {/* 5-Factor Prioritization Engine Overview */}
+        {/* 3-Feed Threat Engine Overview */}
         <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <Cpu className="w-4 h-4 text-indigo-400" />
-            <span>Multi-Factor Risk Engine</span>
+            <span>Authoritative 3-Feed Engine</span>
           </h3>
 
           <div className="space-y-3 text-xs text-slate-300">
             <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
               <span className="w-5 h-5 rounded-md bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-[10px] shrink-0">1</span>
               <div>
-                <strong className="text-white">CVSS v3 Severity:</strong> Normalized baseline scoring (0-35 points)
+                <strong className="text-white">CVSS v3 Severity (45%):</strong> Base technical vulnerability severity score (up to 45 pts)
               </div>
             </div>
 
             <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
               <span className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px] shrink-0">2</span>
               <div>
-                <strong className="text-white">EPSS Exploit Likelihood:</strong> 30-day wild exploit probability (0-25 points)
+                <strong className="text-white">EPSS Exploit Likelihood (35%):</strong> Empirical 30-day wild exploit probability from FIRST.org (up to 35 pts)
               </div>
             </div>
 
             <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
               <span className="w-5 h-5 rounded-md bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-[10px] shrink-0">3</span>
               <div>
-                <strong className="text-white">CISA KEV Bonus:</strong> +15 points for actively weaponized CVEs
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
-              <span className="w-5 h-5 rounded-md bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-[10px] shrink-0">4</span>
-              <div>
-                <strong className="text-white">AST Reachability:</strong> 1.0x multiplier if called from routes; 0.25x if dead code
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
-              <span className="w-5 h-5 rounded-md bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-[10px] shrink-0">5</span>
-              <div>
-                <strong className="text-white">Exposure Analysis:</strong> 1.0x multiplier for public routes / user input
+                <strong className="text-white">CISA KEV Catalog (20%):</strong> Known Exploited Vulnerabilities active in the wild (+20 bonus pts)
               </div>
             </div>
           </div>
@@ -207,11 +190,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="space-y-2 text-xs">
             <div className="flex items-center gap-2 text-slate-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Applies proposed diff in sandbox scratch space</span>
+              <span>Applies proposed diff to an isolated copy in sandbox</span>
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Validates Python AST syntax validity</span>
+              <span>Validates Python AST syntax integrity</span>
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -219,7 +202,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="flex items-center gap-2 text-slate-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Marks fix validated only when finding is 100% eliminated</span>
+              <span>Marks fix &ldquo;verified&rdquo; or &ldquo;failed&rdquo; automatically</span>
             </div>
           </div>
 
@@ -245,7 +228,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
           >
             <span>View All ({stats.open_findings})</span>
-            <ArrowRight className="w-3 h-3" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 

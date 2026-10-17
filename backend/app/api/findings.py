@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.fix_validator import FixValidator
 from app.database import get_db
 from app.github.pr_commenter import PRCommentFormatter
-from app.models import Finding, FindingAnalysis, Scan, Repository
+from app.models import Finding, FindingAnalysis
 from app.scanners.base import RawFinding
-from app.schemas import FindingResponse, FindingStatusUpdate, FindingAnalysisResponse
+from app.schemas import FindingResponse, FindingStatusUpdate
 
 router = APIRouter(prefix="/findings", tags=["Findings"])
 
@@ -19,8 +19,6 @@ async def list_findings(
     severity: Optional[str] = None,
     min_priority: Optional[float] = None,
     tool: Optional[str] = None,
-    reachability: Optional[str] = None,
-    exposure: Optional[str] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
@@ -43,10 +41,6 @@ async def list_findings(
         stmt = stmt.where(Finding.priority_score >= min_priority)
     if tool:
         stmt = stmt.where(Finding.tool == tool.lower())
-    if reachability:
-        stmt = stmt.where(Finding.reachability_status == reachability.lower())
-    if exposure:
-        stmt = stmt.where(Finding.exposure_status == exposure.lower())
     if status:
         stmt = stmt.where(Finding.status == status.lower())
     if search:
@@ -80,7 +74,7 @@ async def update_finding_status(
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found.")
 
-    valid_statuses = {"new", "accepted", "false_positive", "fixed", "regressed"}
+    valid_statuses = {"new", "persistent", "fixed", "regressed", "accepted", "false_positive"}
     if payload.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Choose from: {valid_statuses}")
 
@@ -109,15 +103,14 @@ async def get_pr_comment_preview(finding_id: str, db: AsyncSession = Depends(get
         "cvss_score": finding.cvss_score,
         "epss_score": finding.epss_score,
         "cisa_kev": finding.cisa_kev,
-        "reachability_status": finding.reachability_status,
-        "exposure_status": finding.exposure_status,
         "message": finding.message
     }
     analysis_dict = {
         "explanation": finding.analysis.explanation if finding.analysis else finding.message,
         "attack_scenario": finding.analysis.attack_scenario if finding.analysis else "",
         "proposed_patch": finding.analysis.proposed_patch if finding.analysis else "",
-        "fix_validated": finding.analysis.fix_validated if finding.analysis else False
+        "fix_validated": finding.analysis.fix_validated if finding.analysis else False,
+        "validation_status": getattr(finding.analysis, "validation_status", "verified" if (finding.analysis and finding.analysis.fix_validated) else "failed")
     }
 
     markdown = PRCommentFormatter.format_finding_comment(finding_dict, analysis_dict)
@@ -152,11 +145,13 @@ async def revalidate_fix(finding_id: str, db: AsyncSession = Depends(get_db)):
     )
 
     finding.analysis.fix_validated = is_valid
+    finding.analysis.validation_status = "verified" if is_valid else "failed"
     finding.analysis.validation_details = details
     await db.commit()
 
     return {
         "finding_id": finding.id,
         "fix_validated": is_valid,
+        "validation_status": finding.analysis.validation_status,
         "details": details
     }

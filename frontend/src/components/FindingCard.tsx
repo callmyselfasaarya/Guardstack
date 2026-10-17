@@ -3,11 +3,10 @@ import {
   ShieldAlert,
   Key,
   Package,
-  Globe,
   CheckCircle2,
   ArrowRight,
-  Radio,
-  Network
+  Flame,
+  AlertCircle
 } from 'lucide-react';
 import { Finding } from '../types';
 
@@ -25,17 +24,15 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onClick }) =>
         return { label: 'Gitleaks Secrets', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Key };
       case 'trivy':
         return { label: 'Trivy SCA', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Package };
-      case 'zap':
-        return { label: 'OWASP ZAP', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: Globe };
       default:
         return { label: tool, color: 'bg-slate-800 text-slate-300 border-slate-700', icon: ShieldAlert };
     }
   };
 
   const getPriorityStyle = (score: number) => {
-    if (score >= 75) return { text: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30', label: 'CRITICAL' };
-    if (score >= 55) return { text: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', label: 'HIGH' };
-    if (score >= 35) return { text: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', label: 'MEDIUM' };
+    if (score >= 70) return { text: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/30', label: 'CRITICAL' };
+    if (score >= 50) return { text: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', label: 'HIGH' };
+    if (score >= 30) return { text: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', label: 'MEDIUM' };
     return { text: 'text-slate-400', bg: 'bg-slate-800/60', border: 'border-slate-700', label: 'LOW' };
   };
 
@@ -68,46 +65,41 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onClick }) =>
               {finding.severity}
             </span>
 
-            {/* Reachability Badge */}
-            {finding.reachability_status === 'reachable' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <Network className="w-3 h-3" />
-                Reachable
-              </span>
-            )}
-            {finding.reachability_status === 'unreachable' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
-                Unreachable
-              </span>
-            )}
-
-            {/* Public Exposure Badge */}
-            {finding.exposure_status === 'public_route' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                <Radio className="w-3 h-3" />
-                Public Route
-              </span>
-            )}
-
-            {/* Threat Intel Badges */}
+            {/* Authoritative Threat Feeds */}
             {finding.cisa_kev && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-600/40">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-600/40">
+                <Flame className="w-3 h-3 text-rose-400" />
                 CISA KEV ⚠️
               </span>
             )}
-            {finding.epss_score !== undefined && finding.epss_score > 0.2 && (
+            {finding.epss_score !== undefined && finding.epss_score > 0.05 && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                EPSS: {(finding.epss_score * 100).toFixed(0)}%
+                EPSS: {(finding.epss_score * 100).toFixed(1)}%
               </span>
             )}
 
-            {/* Fix Validated Badge */}
-            {finding.analysis?.fix_validated && (
+            {/* Fix Validation Status */}
+            {finding.analysis?.fix_validated ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                 <CheckCircle2 className="w-3 h-3" />
-                Fix Validated
+                Fix Verified
               </span>
-            )}
+            ) : finding.analysis?.proposed_patch ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                <AlertCircle className="w-3 h-3" />
+                Fix Pending
+              </span>
+            ) : null}
+
+            {/* Lifecycle State: new, persistent, fixed, regressed */}
+            <span className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${
+              finding.status === 'new' ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30' :
+              finding.status === 'persistent' ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30' :
+              finding.status === 'fixed' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' :
+              'bg-rose-500/10 text-rose-300 border border-rose-500/30'
+            }`}>
+              {finding.status}
+            </span>
           </div>
 
           {/* Finding Title */}
@@ -115,11 +107,11 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onClick }) =>
             {finding.title}
           </h3>
 
-          {/* Location & Status */}
+          {/* Location */}
           <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
             <span>{finding.file_path}:{finding.start_line}</span>
             <span>•</span>
-            <span className="text-[11px] font-sans text-slate-400 capitalize">status: {finding.status}</span>
+            <span className="text-[11px] font-sans text-slate-400">rule: {finding.rule_id}</span>
           </div>
         </div>
       </div>

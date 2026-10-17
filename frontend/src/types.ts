@@ -1,7 +1,7 @@
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 export type PriorityTier = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-export type FindingStatus = 'new' | 'existing' | 'fixed' | 'regressed' | 'accepted' | 'false_positive';
-export type ToolName = 'semgrep' | 'gitleaks' | 'trivy' | 'zap';
+export type FindingStatus = 'new' | 'persistent' | 'fixed' | 'regressed' | 'accepted' | 'false_positive';
+export type ToolName = 'semgrep' | 'gitleaks' | 'trivy';
 
 export interface Repository {
   id: string;
@@ -24,6 +24,7 @@ export interface FindingAnalysis {
   confidence: number;
   proposed_patch: string;
   fix_validated: boolean;
+  validation_status?: 'verified' | 'failed' | 'untested';
   validation_details?: {
     re_scan_clean?: boolean;
     syntax_valid?: boolean;
@@ -48,14 +49,6 @@ export interface Finding {
   cvss_score?: number;
   epss_score?: number;
   cisa_kev: boolean;
-  reachability_status: 'reachable' | 'unreachable' | 'unknown';
-  reachability_trace?: {
-    chain?: string[];
-    entrypoint?: string;
-    reachability_type?: string;
-    reason?: string;
-  };
-  exposure_status: 'public_route' | 'internal_only' | 'unknown';
   priority_score: number;
   file_path: string;
   start_line: number;
@@ -72,7 +65,7 @@ export interface Scan {
   commit_hash: string;
   branch: string;
   pr_number?: number;
-  trigger_type: 'push' | 'pull_request' | 'manual' | 'dast' | 'benchmark';
+  trigger_type: 'push' | 'pull_request' | 'manual';
   status: 'queued' | 'running' | 'completed' | 'failed';
   scanner_types: string;
   started_at: string;
@@ -133,16 +126,6 @@ export interface BenchmarkRun {
   created_at: string;
 }
 
-export interface DASTTarget {
-  id: string;
-  url: string;
-  verification_token: string;
-  verified: boolean;
-  verified_at?: string;
-  last_scanned_at?: string;
-  created_at: string;
-}
-
 export interface AppSettings {
   llm_provider: string;
   has_gemini_key: boolean;
@@ -152,5 +135,4 @@ export interface AppSettings {
   ollama_model: string;
   has_github_app: boolean;
   github_app_id: string;
-  dast_allow_localhost: boolean;
 }

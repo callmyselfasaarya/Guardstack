@@ -8,10 +8,11 @@ import json
 import sys
 from pathlib import Path
 
-# Add backend to sys.path
+# Add backend directory to sys.path
 root_dir = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(root_dir / ".venv" / "Lib" / "site-packages"))
-sys.path.insert(0, str(root_dir / "backend"))
+backend_dir = root_dir / "backend"
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 from app.benchmark.runner import BenchmarkSuiteRunner
 
@@ -38,10 +39,11 @@ async def main():
 
     print("\nDetailed Case-by-Case Breakdown:")
     for item in result.get("evaluated_findings", []):
-        reach_badge = "[REACHABLE]" if item["reachability"] == "reachable" else "[DEAD CODE]"
-        action_badge = "[PR BLOCKER]" if item["is_actionable"] else "[FILTERED NOISE]"
-        fix_badge = "[FIX VALIDATED CLEAN]" if item["fix_validated"] else "[UNVALIDATED]"
-        print(f" • {item['title'][:36]:<36} | {item['severity']:<8} | {reach_badge:<12} | {action_badge:<16} | {fix_badge}")
+        kev_badge = "[CISA KEV]" if item.get("cisa_kev") else "[NO KEV]  "
+        epss_str = f"EPSS:{item.get('epss', 0.05)*100:.0f}%"
+        action_badge = "[PR BLOCKER]   " if item["is_actionable"] else "[FILTERED NOISE]"
+        fix_badge = "[FIX VERIFIED CLEAN]" if item["fix_validated"] else "[FIX FAILED]"
+        print(f" • {item['title'][:32]:<32} | {item['severity']:<8} | {kev_badge} {epss_str:<8} | {action_badge} | {fix_badge}")
 
     # Output JSON summary
     out_file = root_dir / "benchmark_audit_results.json"

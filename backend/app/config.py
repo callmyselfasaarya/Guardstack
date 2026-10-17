@@ -36,11 +36,6 @@ class Settings(BaseModel):
     EPSS_API_URL: str = os.getenv("EPSS_API_URL", "https://api.first.org/data/v1/epss")
     CISA_KEV_URL: str = os.getenv("CISA_KEV_URL", "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json")
     FEED_CACHE_HOURS: int = 24
-    
-    # DAST Verification
-    DAST_CHALLENGE_FILE: str = "/.well-known/guardstack-challenge.txt"
-    DAST_ALLOW_LOCALHOST: bool = True
-    
     # Workdir for temporary repos and patch checks
     WORKSPACE_TMP_DIR: Path = BASE_DIR / "workspace_tmp"
 

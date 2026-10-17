@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Any
 
 @dataclass
 class RawFinding:
-    tool: str                          # semgrep, gitleaks, trivy, zap
+    tool: str                          # semgrep, gitleaks, trivy
     rule_id: str                       # e.g. python.lang.security.audit.sqli
     title: str                         # Human-readable title
     message: str                       # Finding explanation / warning

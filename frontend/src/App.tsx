@@ -5,7 +5,6 @@ import { DashboardView } from './pages/DashboardView';
 import { FindingsView } from './pages/FindingsView';
 import { ScansView } from './pages/ScansView';
 import { BenchmarkView } from './pages/BenchmarkView';
-import { DastView } from './pages/DastView';
 import { SettingsView } from './pages/SettingsView';
 import {
   fetchOverviewStats,
@@ -66,35 +65,32 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0e17] text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
-      {/* Top Navbar */}
+    <div className="min-h-screen bg-[#0a0e17] text-slate-100 flex flex-col font-sans selection:bg-indigo-500/20 selection:text-indigo-400">
+      {/* Navbar */}
       <Navbar
         currentTab={currentTab}
-        onTabChange={(tab) => {
-          setCurrentTab(tab);
-          if (tab === 'findings') loadAllData();
-        }}
+        onTabChange={setCurrentTab}
         onOpenScanModal={() => setScanModalOpen(true)}
-        postureScore={stats?.posture_score || 100}
-        llmProvider={settings?.llm_provider || 'heuristic'}
+        postureScore={stats?.posture_score ?? 100}
+        llmProvider={settings?.llm_provider ?? 'heuristic'}
       />
 
-      {/* Main View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-32 space-y-3">
-            <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-            <p className="text-xs text-slate-400">Loading Guardstack ASPM Security Platform...</p>
+          <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-slate-400">Loading Guardstack security telemetry...</p>
           </div>
         ) : (
           <>
             {currentTab === 'dashboard' && (
               <DashboardView
                 stats={stats}
-                onNavigateTab={(tab) => setCurrentTab(tab)}
+                topFindings={findings.slice(0, 5)}
+                onSelectFinding={(id: string) => handleSelectFinding(id)}
+                onNavigateTab={(tab: string) => setCurrentTab(tab as any)}
                 onOpenScanModal={() => setScanModalOpen(true)}
-                onSelectFinding={handleSelectFinding}
-                topFindings={findings}
               />
             )}
 
@@ -118,8 +114,6 @@ export function App() {
 
             {currentTab === 'benchmark' && <BenchmarkView />}
 
-            {currentTab === 'dast' && <DastView />}
-
             {currentTab === 'settings' && <SettingsView />}
           </>
         )}
@@ -141,13 +135,13 @@ export function App() {
           <div className="flex items-center gap-4 text-[11px] text-slate-400">
             <span>Semgrep SAST</span>
             <span>•</span>
-            <span>Gitleaks</span>
+            <span>Gitleaks Secrets</span>
             <span>•</span>
-            <span>Trivy SCA</span>
+            <span>Trivy Dependencies</span>
             <span>•</span>
-            <span>OWASP ZAP</span>
+            <span>CVSS / EPSS / CISA KEV Scoring</span>
             <span>•</span>
-            <span>Python AST Reachability</span>
+            <span>Verified Fix Loop</span>
           </div>
         </div>
       </footer>

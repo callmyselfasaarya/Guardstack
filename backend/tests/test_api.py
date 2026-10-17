@@ -3,8 +3,6 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.database import init_db
 
-
-
 @pytest.mark.asyncio
 async def test_health_endpoint():
     transport = ASGITransport(app=app)
@@ -44,18 +42,6 @@ async def test_repositories_and_scan_flow():
         scan_data = res_scan.json()
         assert scan_data["repo_id"] == repo_id
         assert scan_data["status"] in {"queued", "running"}
-
-@pytest.mark.asyncio
-async def test_dast_challenge_flow():
-    await init_db()
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        challenge_payload = {"target_url": "http://localhost:3000"}
-        res = await client.post("/api/dast/challenge", json=challenge_payload)
-        assert res.status_code == 200
-        data = res.json()
-        assert "verification_token" in data
-        assert data["expected_path"] == "/.well-known/guardstack-challenge.txt"
 
 @pytest.mark.asyncio
 async def test_settings_endpoint():

@@ -4,7 +4,6 @@ import type {
   Scan,
   Finding,
   BenchmarkRun,
-  DASTTarget,
   AppSettings
 } from '../types';
 
@@ -78,7 +77,7 @@ export async function fetchFindings(params?: Record<string, string>): Promise<Fi
 
 export async function fetchFinding(id: string): Promise<Finding> {
   const res = await fetch(`${API_BASE}/findings/${id}`);
-  if (!res.ok) throw new Error('Failed to fetch finding details');
+  if (!res.ok) throw new Error('Failed to fetch finding');
   return res.json();
 }
 
@@ -94,11 +93,11 @@ export async function updateFindingStatus(id: string, status: string): Promise<F
 
 export async function fetchPRCommentPreview(id: string): Promise<{ finding_id: string; markdown: string }> {
   const res = await fetch(`${API_BASE}/findings/${id}/pr-comment-preview`);
-  if (!res.ok) throw new Error('Failed to load PR comment preview');
+  if (!res.ok) throw new Error('Failed to fetch PR comment preview');
   return res.json();
 }
 
-export async function revalidateFix(id: string): Promise<{ finding_id: string; fix_validated: boolean; details: any }> {
+export async function validateFindingFix(id: string) {
   const res = await fetch(`${API_BASE}/findings/${id}/validate-fix`, {
     method: 'POST',
   });
@@ -108,7 +107,7 @@ export async function revalidateFix(id: string): Promise<{ finding_id: string; f
 
 export async function fetchLatestBenchmark(): Promise<BenchmarkRun> {
   const res = await fetch(`${API_BASE}/benchmark/latest`);
-  if (!res.ok) throw new Error('Failed to fetch latest benchmark');
+  if (!res.ok) throw new Error('Failed to fetch benchmark');
   return res.json();
 }
 
@@ -125,42 +124,6 @@ export async function runBenchmark(suiteName: string = 'owasp_top10_corpus'): Pr
     body: JSON.stringify({ suite_name: suiteName }),
   });
   if (!res.ok) throw new Error('Failed to run benchmark');
-  return res.json();
-}
-
-export async function fetchDastTargets(): Promise<DASTTarget[]> {
-  const res = await fetch(`${API_BASE}/dast/targets`);
-  if (!res.ok) throw new Error('Failed to fetch DAST targets');
-  return res.json();
-}
-
-export async function createDastChallenge(target_url: string) {
-  const res = await fetch(`${API_BASE}/dast/challenge`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target_url }),
-  });
-  if (!res.ok) throw new Error('Failed to generate challenge token');
-  return res.json();
-}
-
-export async function verifyDastTarget(target_url: string) {
-  const res = await fetch(`${API_BASE}/dast/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target_url }),
-  });
-  if (!res.ok) throw new Error('Failed to verify target');
-  return res.json();
-}
-
-export async function runDastScan(target_url: string) {
-  const res = await fetch(`${API_BASE}/dast/scan`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target_url }),
-  });
-  if (!res.ok) throw new Error('Failed to execute DAST scan');
   return res.json();
 }
 

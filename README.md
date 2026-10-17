@@ -1,28 +1,53 @@
 # 🛡️ Guardstack
 
-> **Intelligent Application Security Posture Management (ASPM) & Automated PR Remediation Platform**
+> **Minimalistic ASPM & Automated Pull Request Remediation Platform**
 
-Guardstack is an end-to-end ASPM and PR remediation platform. On every push or pull request, it runs open-source scanners (Semgrep, Gitleaks, Trivy, and OWASP ZAP), normalizes their output into uniform SARIF-compatible schemas, prioritizes vulnerabilities using an innovative multi-factor risk engine (CVSS + EPSS + CISA KEV + Python AST call-graph reachability + route exposure), applies an LLM to generate plain-language explanations, attack scenarios, and verified patch diffs, and surfaces findings via an automated GitHub review bot and a sleek web dashboard.
-
----
-
-## 🌟 Core Contributions & Technical Defensibility
-
-Evaluators care about measurable results over UI cosmetics. Guardstack delivers three defensible technical breakthroughs:
-
-| Dimension | Standard Scanners (Semgrep, Gitleaks, Trivy) | **Guardstack ASPM Platform** |
-|---|---|---|
-| **Developer Noise & Fatigue** | Inundates developer PRs with non-reachable dead code and minor warnings | **88.9% Developer Noise Reduction** by down-weighting unreachable code via Python AST call-graph traversal |
-| **Fix Reliability** | Manual remediation or raw LLM diffs prone to hallucination & syntax regressions | **100% Fix Validation Guarantee**: Automatically applies diff in sandboxed scratch space and re-scans before PR posting |
-| **False Positive Filtering** | Static pattern match with high false-positive rates | **95.0% Precision & 98.0% Recall** tested against benchmark vulnerability corpus |
-| **DAST Safety** | Arbitrary URL scans risk unauthorized scanning liability | **Strict HTTP Well-Known Domain Verification** (`/.well-known/guardstack-challenge.txt`) before scanning |
-| **PR Developer Experience** | Wall of text or external dashboard links | **One-Click GitHub Review Suggestions** (` ```suggestion `) directly inside PR threads |
+Guardstack is an Application Security Posture Management (ASPM) and automated PR remediation platform designed with a focused, locked scope. On every push or pull request (or via manual repo scan), it runs three open-source scanners, normalizes output into a unified SARIF schema, tracks finding lifecycles across commits (**new / persistent / fixed**), scores real-world risk using authoritative threat feeds (**CVSS + EPSS + CISA KEV**), generates structured LLM explanations and patch diffs, and validates fixes in an automated sandboxed re-scan loop before posting actionable GitHub PR comments.
 
 ---
 
-## 📊 Empirical Defense Benchmark Results
+## 🎯 Locked Scope & Minimalist Architecture
 
-Guardstack includes a built-in automated benchmark suite evaluated against known intentionally vulnerable application patterns (SQLi, XSS, Command Injection, Insecure Deserialization, Hardcoded Secrets, and High-Profile CVEs):
+Guardstack adheres to a clean, well-defined scope:
+
+### In Scope
+1. **Triggers:** GitHub Webhook trigger on `push` and `pull_request` events, plus manual scan of repository paths and URLs.
+2. **Three Scanners Only:**
+   - **SAST:** Semgrep (SQLi, command injection, insecure deserialization, weak cryptography, XSS)
+   - **Secrets:** Gitleaks (AWS credentials, GitHub PATs, private keys, API tokens)
+   - **Dependencies (SCA):** Trivy / OSV-Scanner (CVE detection in `requirements.txt`)
+3. **Normalization & Fingerprinting:**
+   - Unified SARIF-based data model with deterministic SHA-256 fingerprinting.
+   - Cross-commit lifecycle tracking: **`new`**, **`persistent`**, and **`fixed`** (with regression detection).
+4. **Prioritization Score (Core Original Contribution):**
+   - Direct combination of three authoritative, free feeds:
+     - **CVSS v3.1 Base Severity** (45% weight, up to 45 pts)
+     - **FIRST.org EPSS Exploit Prediction** (35% weight, up to 35 pts)
+     - **CISA Known Exploited Vulnerabilities (KEV)** (+20 pts bonus for actively weaponized CVEs)
+   - Composite 0–100 risk score that separates actionable PR blockers from non-actionable noise.
+5. **LLM Analysis & Remediation:**
+   - Multi-provider adapter supporting Google Gemini, OpenAI GPT-4o, Anthropic Claude, and Local Ollama (for zero code leakage), plus an offline heuristic engine.
+   - Returns structured JSON: plain-language explanation, step-by-step attack scenario, false-positive likelihood, confidence score, and syntactically valid unified patch diff.
+6. **Fix Validation Loop:**
+   - Applies the proposed diff to an isolated scratch copy.
+   - Re-runs the scanner that discovered the finding.
+   - Marks the fix **`verified`** (finding completely eliminated on re-scan) or **`failed`**.
+7. **Dashboard & PR Bot:**
+   - React + TypeScript + Tailwind dark cybersecurity dashboard.
+   - Findings list with filters (tool, severity, status, search), trend metrics across commits, per-finding detail with unified diff viewer.
+   - GitHub PR Review Bot with one-click suggestions (` ```suggestion `).
+8. **Language Focus:** Pure Python focus for SAST and dependency analysis.
+
+### Cut (Future Roadmap)
+- **OWASP ZAP / DAST:** Cut to eliminate staging target ownership verification overhead, legal liability, and separate pipeline complexity. Slated for future work.
+- **AST Call-Graph Reachability:** Replaced with pure authoritative feed prioritization (CVSS + EPSS + CISA KEV) to keep static analysis deterministic and lightweight.
+- **Multi-language Support, Multi-tenant Auth & Billing:** Cut to keep the platform clean and minimalistic.
+
+---
+
+## 📊 Empirical Defense Benchmark
+
+Evaluated against an intentionally vulnerable test corpus with ground-truth test cases:
 
 ```
 =================================================================
@@ -40,11 +65,10 @@ Non-actionable Noise Suppressed:                8
 -----------------------------------------------------------------
 ```
 
-Run this evaluation anytime from the CLI:
+Run the benchmark CLI:
 ```bash
 python scripts/run-benchmark.py
 ```
-Or view the live benchmark charts and download the audit JSON report directly in the **Defense Benchmark** tab of the web dashboard.
 
 ---
 
@@ -55,39 +79,38 @@ flowchart TD
     subgraph Triggers ["1. Ingestion & Triggers"]
         GH["GitHub App Webhook (Push / PR)"]
         CLI["Manual Scan Trigger (Local / Git URL)"]
-        SIM["Dashboard Webhook Simulator"]
+        SIM["Dashboard PR Simulator"]
     end
 
-    subgraph ScannerLayer ["2. Scan Orchestration Layer (Wrap, Don't Build)"]
-        SAST["Semgrep (SAST - SQLi, XSS, Insecure Patterns)"]
-        SECRETS["Gitleaks (Secrets & High-Entropy Tokens)"]
-        SCA["Trivy (Dependency CVEs & SCA)"]
-        DAST["OWASP ZAP (DAST with Token Verification)"]
+    subgraph ScannerLayer ["2. Three Scanners Only"]
+        SAST["Semgrep (Python SAST)"]
+        SECRETS["Gitleaks (Secrets)"]
+        SCA["Trivy (Dependencies)"]
     end
 
-    subgraph Normalization ["3. Normalization & Fingerprinting"]
-        SARIF["SARIF Normalization Engine"]
-        FP["Deterministic SHA256 Fingerprint Generator"]
+    subgraph Normalization ["3. Normalization & Lifecycle"]
+        SARIF["SARIF Normalization"]
+        FP["SHA256 Fingerprinting"]
+        STATE["Lifecycle: new / persistent / fixed"]
     end
 
-    subgraph Prioritization ["4. Prioritization & Risk Engine (Core Contribution)"]
-        CVSS["CVSS v3.1 Severity Score (0-35 pts)"]
-        EPSS["EPSS 30-Day Exploit Likelihood (0-25 pts)"]
-        KEV["CISA KEV Wild Exploit Bonus (+15 pts)"]
-        REACH["Python AST Call-Graph Reachability (0.25x - 1.0x)"]
-        EXP["Public Route & User Input Exposure (0.45x - 1.0x)"]
+    subgraph Prioritization ["4. Prioritization Engine (Authoritative Feeds)"]
+        CVSS["CVSS Base Severity (45 pts)"]
+        EPSS["FIRST.org EPSS (35 pts)"]
+        KEV["CISA KEV Wild Exploitation (+20 pts)"]
     end
 
     subgraph AI ["5. AI Analysis & Fix Validation Loop"]
-        LLM["Unified LLM Adapter (Gemini / OpenAI / Anthropic / Ollama / Heuristic)"]
-        SANDBOX["Isolated Scratch Sandbox"]
-        RESCAN["Automated Scanner Re-Scan Verification"]
+        LLM["LLM Analysis (Structured JSON)"]
+        SANDBOX["Sandbox Scratch Copy"]
+        RESCAN["Scanner Re-Scan Verification"]
+        STATUS["Mark Fix: verified or failed"]
     end
 
     subgraph Interfaces ["6. Presentation & PR Bot"]
-        PRBOT["GitHub PR Review Bot (One-Click Suggestions)"]
-        DASH["React + Vite + Tailwind Cybersecurity Dashboard"]
-        BENCH["Empirical Defense Benchmark Suite"]
+        PRBOT["GitHub PR Comment Bot (One-Click Suggestions)"]
+        DASH["React + TypeScript Dashboard with Diff Viewer"]
+        BENCH["Defense Benchmark Suite"]
     end
 
     Triggers --> ScannerLayer
@@ -96,108 +119,55 @@ flowchart TD
     Prioritization --> AI
     AI --> SANDBOX
     SANDBOX --> RESCAN
-    RESCAN --> Interfaces
+    RESCAN --> STATUS
+    STATUS --> Interfaces
 ```
+
+---
+
+## 📐 Prioritization Risk Formula
+
+The Priority Score ($0 \le S \le 100$) is computed transparently:
+
+$$\text{Priority Score} = \left(\frac{\text{CVSS}}{10} \times 45\right) + (\text{EPSS} \times 35) + \mathbb{I}_{\text{KEV}} \times 20$$
+
+Where:
+- $\text{CVSS} \in [0.0, 10.0]$: Base vulnerability severity score.
+- $\text{EPSS} \in [0.0, 1.0]$: Empirical 30-day wild exploit probability from FIRST.org.
+- $\mathbb{I}_{\text{KEV}} \in \{0, 1\}$: $1$ if listed in CISA Known Exploited Vulnerabilities catalog, $0$ otherwise.
+- Findings with $\text{Score} \ge 50.0$ are classified as **Actionable PR Blockers**; others are filtered as non-actionable noise.
 
 ---
 
 ## 🚀 Quickstart Guide
 
-### Prerequisites
-- Python 3.10+
-- Bun (`bun --version`) or Node.js
-
-### 1. Clone & Configure
-```bash
-git clone https://github.com/callmyselfasaarya/Guardstack.git
-cd Guardstack
-copy .env.example .env
-```
-
-### 2. Launch Local Development
-Start both the FastAPI backend and React Vite dashboard with a single command:
-
-**On Windows (PowerShell):**
+### 1. Launch Unified Backend & Web Dashboard
 ```powershell
-.\scripts\start-dev.ps1
+# Set Python path and launch the FastAPI server (serves both API & React dashboard)
+$env:PYTHONPATH = "$PWD\.venv\Lib\site-packages;$PWD\backend"
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-**On Windows (Command Prompt):**
-```cmd
-scripts\start-dev.bat
-```
+Open your browser:
+- **Web Dashboard:** [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- **Interactive OpenAPI Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-**Manual Start:**
-```bash
-# Terminal 1: Backend
-set PYTHONPATH=.venv\Lib\site-packages;
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-
-# Terminal 2: Frontend
-cd frontend
-bun run dev
-```
-
-- **Web Dashboard:** [http://127.0.0.1:5173](http://127.0.0.1:5173)
-- **Interactive Swagger API Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-
----
-
-## 🐳 Docker Deployment
-
-Guardstack comes pre-configured with a production-ready `docker-compose.yml` orchestrating PostgreSQL 16, Redis 7, the containerized FastAPI backend with official scanner binaries (Semgrep, Gitleaks, Trivy), and the Nginx-served React frontend:
-
-```bash
-docker compose up -d --build
-```
-
----
-
-## 🧪 Automated Testing
-
-Guardstack features comprehensive automated test coverage across scanner normalization, AST reachability analysis, threat intelligence integration, noise suppression, API routes, and the sandboxed fix validation loop:
-
-```bash
-set PYTHONPATH=.venv\Lib\site-packages;backend
+### 2. Run Automated Test Suite
+```powershell
+$env:PYTHONPATH = "$PWD\.venv\Lib\site-packages;$PWD\backend"
 python -m pytest backend/tests -v
 ```
 
-Output:
+### 3. Run Defense Benchmark
+```powershell
+$env:PYTHONPATH = "$PWD\.venv\Lib\site-packages;$PWD\backend"
+python scripts/run-benchmark.py
 ```
-============================= test session starts =============================
-backend/tests/test_api.py::test_health_endpoint PASSED                   [  9%]
-backend/tests/test_api.py::test_repositories_and_scan_flow PASSED        [ 18%]
-backend/tests/test_api.py::test_dast_challenge_flow PASSED               [ 27%]
-backend/tests/test_api.py::test_settings_endpoint PASSED                 [ 36%]
-backend/tests/test_fix_validator.py::test_fix_validation_loop PASSED     [ 45%]
-backend/tests/test_prioritization.py::test_reachability_distinguishes_live_route_and_dead_code PASSED [ 54%]
-backend/tests/test_prioritization.py::test_exposure_detection PASSED     [ 63%]
-backend/tests/test_prioritization.py::test_risk_prioritization_noise_suppression PASSED [ 72%]
-backend/tests/test_scanners.py::test_semgrep_scanner_detects_sqli_and_xss PASSED [ 81%]
-backend/tests/test_scanners.py::test_gitleaks_scanner_detects_secrets PASSED [ 90%]
-backend/tests/test_scanners.py::test_trivy_scanner_detects_cve_dependencies PASSED [100%]
-======================= 11 passed in 1.43s ========================
-```
-
----
-
-## 📐 Prioritization & Risk Formula
-
-The Priority Risk Score ($0 \le S \le 100$) is computed dynamically for every normalized finding:
-
-$$\text{Threat Base} = \left(\frac{\text{CVSS}}{10} \times 35\right) + (\text{EPSS} \times 25) + \mathbb{I}_{\text{KEV}} \times 15$$
-
-$$\text{Priority Score} = \min\left(100,\, \text{Threat Base} \times M_{\text{reach}} \times M_{\text{exposure}} \times \frac{100}{75}\right)$$
-
-Where:
-- $M_{\text{reach}} = 1.0$ if reachable from an application route, $0.25$ if dead code, $0.75$ if unknown.
-- $M_{\text{exposure}} = 1.0$ if public route / user input, $0.45$ if internal only, $0.80$ if unknown.
-- $\mathbb{I}_{\text{KEV}} = 1$ if listed in CISA Known Exploited Vulnerabilities, $0$ otherwise.
 
 ---
 
 ## 🔒 Security & Privacy
 
-- **Local LLM Option:** When handling proprietary code, configure **Ollama** in the Settings tab or `.env` (`LLM_PROVIDER=ollama`) to ensure zero code snippets leave your infrastructure.
-- **DAST Authorization Challenge:** Scans against non-localhost targets require hosting a unique token at `/.well-known/guardstack-challenge.txt` or sending `X-Guardstack-Verification`, preventing unauthorized scanning.
-- **Human-in-the-Loop PR Reviews:** Guardstack never auto-merges fixes; it generates verified unified diffs and one-click GitHub suggestions for developer review.
+- **Local Privacy with Ollama:** Configure `LLM_PROVIDER=ollama` in Settings or `.env` so that zero proprietary source code ever leaves your infrastructure.
+- **Never Auto-Merge:** Guardstack never auto-merges fixes; it displays syntax-highlighted unified diffs and PR review comments with one-click GitHub suggestions for explicit developer approval.
+- **Fix Validation Guarantee:** Every AI patch is applied to a copy in a sandbox and re-scanned with the discovering scanner to ensure findings are 100% eliminated before developers review them.

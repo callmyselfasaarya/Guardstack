@@ -6,17 +6,14 @@ import {
   GitPullRequest,
   CheckCircle2,
   RefreshCw,
-  ExternalLink,
   Flame,
-  AlertOctagon,
   FileCode,
-  Radio
+  AlertTriangle
 } from 'lucide-react';
 import { Finding } from '../types';
 import { DiffViewer } from './DiffViewer';
-import { CallGraphViewer } from './CallGraphViewer';
 import { PRCommentModal } from './PRCommentModal';
-import { updateFindingStatus, revalidateFix } from '../api/client';
+import { updateFindingStatus, validateFindingFix } from '../api/client';
 
 interface FindingDrawerProps {
   finding: Finding | null;
@@ -51,7 +48,7 @@ export const FindingDrawer: React.FC<FindingDrawerProps> = ({
   const handleRevalidate = async () => {
     setValidating(true);
     try {
-      const res = await revalidateFix(finding.id);
+      const res = await validateFindingFix(finding.id);
       alert(res.details?.message || (res.fix_validated ? 'Fix verified clean!' : 'Fix validation failed.'));
       onFindingUpdated();
     } catch (err) {
@@ -64,6 +61,7 @@ export const FindingDrawer: React.FC<FindingDrawerProps> = ({
 
   const analysis = finding.analysis;
   const isFixValidated = analysis?.fix_validated;
+  const validationStatus = analysis?.validation_status || (isFixValidated ? 'verified' : 'failed');
 
   return (
     <>
@@ -99,43 +97,30 @@ export const FindingDrawer: React.FC<FindingDrawerProps> = ({
 
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Threat Intelligence Matrix */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Authoritative 3-Factor Threat Feeds */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-              <span className="text-[10px] uppercase font-bold text-slate-400">CVSS v3</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">CVSS v3 Severity</span>
               <div className="text-base font-bold text-white">
                 {finding.cvss_score ? `${finding.cvss_score} / 10` : 'N/A'}
               </div>
-              <p className="text-[10px] text-slate-400">Base severity</p>
+              <p className="text-[10px] text-slate-400">Technical base score</p>
             </div>
             <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
               <span className="text-[10px] uppercase font-bold text-slate-400">EPSS Likelihood</span>
               <div className="text-base font-bold text-emerald-400">
                 {finding.epss_score !== undefined ? `${(finding.epss_score * 100).toFixed(1)}%` : '< 5%'}
               </div>
-              <p className="text-[10px] text-slate-400">30-day exploit prob.</p>
+              <p className="text-[10px] text-slate-400">30-day exploit probability</p>
             </div>
             <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-              <span className="text-[10px] uppercase font-bold text-slate-400">CISA KEV</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">CISA KEV Feed</span>
               <div className={`text-base font-bold ${finding.cisa_kev ? 'text-rose-400' : 'text-slate-400'}`}>
                 {finding.cisa_kev ? 'ACTIVE ⚠️' : 'Not Listed'}
               </div>
-              <p className="text-[10px] text-slate-400">Known exploited</p>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Public Route</span>
-              <div className="text-base font-bold text-cyan-400 capitalize">
-                {finding.exposure_status === 'public_route' ? 'Exposed' : 'Internal'}
-              </div>
-              <p className="text-[10px] text-slate-400">Network exposure</p>
+              <p className="text-[10px] text-slate-400">Wild weaponization</p>
             </div>
           </div>
-
-          {/* Call Graph Reachability */}
-          <CallGraphViewer
-            status={finding.reachability_status}
-            trace={finding.reachability_trace}
-          />
 
           {/* Vulnerable Code Snippet */}
           <div className="space-y-2">
@@ -170,7 +155,7 @@ export const FindingDrawer: React.FC<FindingDrawerProps> = ({
             </div>
           )}
 
-          {/* Proposed Fix Diff */}
+          {/* Proposed Fix Diff & Fix Validation Status */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -179,11 +164,12 @@ export const FindingDrawer: React.FC<FindingDrawerProps> = ({
               {isFixValidated ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  Validated by Re-scan
+                  Fix Verified
                 </span>
               ) : (
-                <span className="text-[11px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                  Pending Sandbox Re-scan
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Fix Failed / Untested
                 </span>
               )}
             </div>
@@ -208,7 +194,7 @@ export const FindingDrawer: React.FC<FindingDrawerProps> = ({
               </div>
               <p className="text-[11px] text-slate-400">
                 {analysis?.validation_details?.message ||
-                  'Guardstack tests proposed diffs in an isolated temporary sandbox to confirm the scanner finding is 100% eliminated.'}
+                  'Guardstack applies the patch to a copy in an isolated sandbox, re-runs the scanner, and marks the fix "verified" or "failed".'}
               </p>
             </div>
           </div>
@@ -224,9 +210,11 @@ export const FindingDrawer: React.FC<FindingDrawerProps> = ({
               className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xs focus:outline-none"
             >
               <option value="new">Status: New</option>
+              <option value="persistent">Status: Persistent</option>
+              <option value="fixed">Status: Fixed</option>
+              <option value="regressed">Status: Regressed</option>
               <option value="accepted">Status: Accepted Risk</option>
               <option value="false_positive">Status: False Positive</option>
-              <option value="fixed">Status: Fixed</option>
             </select>
           </div>
 

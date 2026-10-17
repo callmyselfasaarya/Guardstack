@@ -25,6 +25,8 @@ wheels/
 .tmp/
 guardstack.db
 *.sqlite3
+.pytest_cache/
+workspace_tmp/
 
 # Node / Frontend
 node_modules/
